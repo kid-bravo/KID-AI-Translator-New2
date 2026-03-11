@@ -1,4 +1,4 @@
-name: deploy-worker (Linux App Service)
+name: deploy-worker (Linux App Service - OIDC)
 
 on:
   workflow_dispatch: {}
@@ -9,13 +9,13 @@ on:
       - "requirements-worker.txt"
       - "requirements.txt"
       - ".github/workflows/main_translatorworker.yml"
-      # opsional:
+      # opsional jika mau ikut memicu
       - "app/**"
       - "webjob/translator-worker/**"
 
 permissions:
   contents: read
-  id-token: write
+  id-token: write   # <-- WAJIB untuk OIDC (GitHub mengeluarkan ID token ke Azure)
 
 jobs:
   deploy:
@@ -41,20 +41,28 @@ jobs:
           echo "No requirements file found, skipping pip install"
         fi
 
-    - name: Build WebApp package (zip)
+    # --- OIDC login ke Azure (tanpa secret creds JSON) ---
+    # Ambil 3 nilai ini dari GUI:
+    #   client-id = App registrations > Application (client) ID
+    #   tenant-id = Directory (tenant) ID
+    #   subscription-id = Subscriptions > Subscription ID
+    - name: Azure Login (OIDC)
+      uses: azure/login@v1
+      with:
+        client-id: "<APP_REG_CLIENT_ID>"      # <-- GANTI
+        tenant-id: "<TENANT_ID>"              # <-- GANTI
+        subscription-id: "<SUBSCRIPTION_ID>"  # <-- GANTI
+
+    # Kirim paket ke App Service Linux (worker)
+    - name: Create deployment zip (explicit)
       run: |
         set -e
         zip -r worker_deploy.zip . -x "**/.git/**" "**/__pycache__/**" "**/.venv/**" "*.DS_Store"
         echo "=== ZIP CONTENTS (first 200 lines) ==="
         unzip -l worker_deploy.zip | head -n 200
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
     - name: Deploy to Azure Web App (worker)
       uses: azure/webapps-deploy@v3
       with:
-        app-name: "KID-Worker"         # <-- pastikan sama PERSIS dengan nama App Service
+        app-name: "KID-Worker"         # <-- pastikan sama persis dengan nama App Service worker
         package: "worker_deploy.zip"
