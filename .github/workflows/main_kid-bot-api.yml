@@ -1,4 +1,4 @@
-name: Deploy API (KID-BOT-API) - Minimal SP Secret
+name: Deploy API (KID-BOT-API) - Minimal SP Secret (Stable)
 
 on:
   workflow_dispatch: {}
@@ -21,20 +21,68 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # ---- Preflight: pastikan secret ada & JSON valid (camelCase keys) ----
+    # ---- Preflight: validasi secret AZURE_CREDENTIALS (camelCase & JSON valid) ----
     - name: Preflight - validate AZURE_CREDENTIALS secret
       shell: bash
       env:
         AZ_JSON: ${{ secrets.AZURE_CREDENTIALS }}
       run: |
-        set -e
-        if [ -z "${AZ_JSON}" ]; then
+        set -euo pipefail
+        # 1) Pastikan secret ada
+        if [ -z "${AZ_JSON:-}" ]; then
           echo "::error::Secret AZURE_CREDENTIALS tidak ditemukan atau kosong. Buat di Settings > Secrets > Actions."
           exit 1
         fi
-        # install jq utk validasi JSON
+
+        # 2) Pastikan jq ada
         sudo apt-get update -y >/dev/null 2>&1 || true
         sudo apt-get install -y jq >/dev/null 2>&1 || true
-        echo "${AZ_JSON}" | jq . >/dev/null 2>&1 || (echo "::error::AZURE_CREDENTIALS bukan JSON valid"; exit 1)
+
+        # 3) Tulis ke file agar aman dari quoting/CRLF
+        printf '%s' "${AZ_JSON}" > cred.json
+
+        # 4) JSON valid?
+        jq . cred.json >/dev/null 2>&1 || { echo "::error::AZURE_CREDENTIALS bukan JSON valid"; exit 1; }
+
+        # 5) Wajib ada key camelCase dan nilainya tidak kosong
         for key in clientId clientSecret tenantId subscriptionId; do
-          echo "${AZ_JSON}" | jq -e --arg k "$key" 'has($k) and (.[$k] != null and .[$k] != "")' >/dev/null 2>&1 \
+          jq -e --arg k "$key" 'has($k) and (.[$k] != null and .[$k] != "")' cred.json >/dev/null 2>&1 \
+            || { echo "::error::Key '$key' tidak ada / kosong di AZURE_CREDENTIALS (wajib camelCase)."; exit 1; }
+        done
+        echo "Preflight OK"
+
+    # ---- (opsional) sanity install supaya error dependency cepat ketahuan ----
+    - name: Install deps (sanity)
+      shell: bash
+      run: |
+        set -e
+        if [ -f requirements-api.txt ]; then
+          pip install -r requirements-api.txt
+        elif [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+          echo "No requirements file found, skipping pip install"
+        fi
+
+    # ---- paketkan source (zip) agar isi yang dikirim jelas ----
+    - name: Create deployment zip
+      shell: bash
+      run: |
+        set -e
+        zip -r api_deploy.zip . -x "**/.git/**" "**/__pycache__/**" "**/.venv/**" "*.DS_Store"
+        echo "=== ZIP CONTENTS (first 200 lines) ==="
+        unzip -l api_deploy.zip | head -n 200
+
+    # ---- LOGIN AZURE (SP JSON secret) ----
+    - name: Azure Login (Service Principal JSON)
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # ---- DEPLOY ----
+    - name: Deploy to Azure Web App (API)
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'KID-BOT-API'   # <-- pastikan sama persis nama App Service API
+        slot-name: 'Production'
+        package: 'api_deploy.zip'
