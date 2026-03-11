@@ -1,17 +1,11 @@
-# server.py
 from fastapi import FastAPI
-from app.main import app as api_app       # FastAPI utama (healthz, upload, jobs, dll)
-from bot.asgi import app as bot_app       # Aplikasi Bot (ASGI)
+from app.main import app as api_app
+from bot.asgi import app as bot_app
 
 app = FastAPI(title="api-bot-composed")
 
-# Penting: mount yang lebih spesifik dulu
-
-app = FastAPI(title="api-bot-composed")
-
-# Bot Framework HARUS di /api
+# Bot Framework HARUS memakai /api
 app.mount("/api", bot_app)
 
-# API lain tetap jalan
-app.mount("/", api_app
-
+# API utama tetap berjalan normal
+app.mount("/", api_app)
