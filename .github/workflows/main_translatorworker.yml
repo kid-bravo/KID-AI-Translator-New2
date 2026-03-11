@@ -1,4 +1,4 @@
-name: deploy-worker (Linux App Service - OIDC)
+name: deploy-worker (Linux App Service - SP Secret)
 
 on:
   workflow_dispatch: {}
@@ -9,13 +9,9 @@ on:
       - "requirements-worker.txt"
       - "requirements.txt"
       - ".github/workflows/main_translatorworker.yml"
-      # opsional jika mau ikut memicu
-      - "app/**"
-      - "webjob/translator-worker/**"
 
 permissions:
-  contents: read
-  id-token: write   # <-- WAJIB untuk OIDC (GitHub mengeluarkan ID token ke Azure)
+  contents: read   # tidak perlu id-token untuk mode secret (creds JSON)
 
 jobs:
   deploy:
@@ -41,28 +37,26 @@ jobs:
           echo "No requirements file found, skipping pip install"
         fi
 
-    # --- OIDC login ke Azure (tanpa secret creds JSON) ---
-    # Ambil 3 nilai ini dari GUI:
-    #   client-id = App registrations > Application (client) ID
-    #   tenant-id = Directory (tenant) ID
-    #   subscription-id = Subscriptions > Subscription ID
-    - name: Azure Login (OIDC)
-      uses: azure/login@v1
-      with:
-        client-id: "<APP_REG_CLIENT_ID>"      # <-- GANTI
-        tenant-id: "<TENANT_ID>"              # <-- GANTI
-        subscription-id: "<SUBSCRIPTION_ID>"  # <-- GANTI
-
-    # Kirim paket ke App Service Linux (worker)
-    - name: Create deployment zip (explicit)
+    # (opsional tapi membantu debug) kemas repo jadi ZIP agar isi paket jelas
+    - name: Create deployment zip
       run: |
         set -e
         zip -r worker_deploy.zip . -x "**/.git/**" "**/__pycache__/**" "**/.venv/**" "*.DS_Store"
         echo "=== ZIP CONTENTS (first 200 lines) ==="
         unzip -l worker_deploy.zip | head -n 200
+        # pastikan file entry-point ikut:
+        test -f worker/worker.py && echo "[OK] found worker/worker.py" || (echo "[FAIL] worker/worker.py not found in repo!" && exit 1)
 
+    # ====== LOGIN AZURE (harus sebelum deploy) ======
+    # Gunakan secret AZURE_CREDENTIALS (JSON camelCase: clientId, clientSecret, tenantId, subscriptionId)
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # ====== DEPLOY ======
     - name: Deploy to Azure Web App (worker)
       uses: azure/webapps-deploy@v3
       with:
-        app-name: "KID-Worker"         # <-- pastikan sama persis dengan nama App Service worker
+        app-name: "KID-Worker"          # <-- ganti bila nama App Service berbeda
         package: "worker_deploy.zip"
