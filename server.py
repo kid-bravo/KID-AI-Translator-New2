@@ -6,5 +6,12 @@ from bot.asgi import app as bot_app       # Aplikasi Bot (ASGI)
 app = FastAPI(title="api-bot-composed")
 
 # Penting: mount yang lebih spesifik dulu
-app.mount("/bot", bot_app)   # semua endpoint bot di bawah /bot (termasuk /bot/api/messages, /bot/diag)
-app.mount("/", api_app)      # sisanya ke API utama
+
+app = FastAPI(title="api-bot-composed")
+
+# Bot Framework HARUS di /api
+app.mount("/api", bot_app)
+
+# API lain tetap jalan
+app.mount("/", api_app
+
