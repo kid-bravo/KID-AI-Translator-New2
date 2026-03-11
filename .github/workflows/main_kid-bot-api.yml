@@ -1,93 +1,40 @@
-# Build & Deploy API to Azure App Service (Linux) using SP JSON secret
-# - Login via azure/login@v1 with creds: ${{ secrets.AZURE_CREDENTIALS }}
-# - Deploy via azure/webapps-deploy@v3
-# - Hanya trigger kalau file API yang berubah (biar tidak tabrakan dengan worker)
-
-name: Build and deploy Python app to Azure Web App - KID-BOT-API
+name: Deploy API (KID-BOT-API) - Minimal SP Secret
 
 on:
   workflow_dispatch: {}
   push:
     branches: [ main ]
-    paths:
-      - "app/**"
-      - "bot/**"
-      - "server.py"
-      - "requirements-api.txt"
-      - "requirements.txt"
-      - ".github/workflows/main_kid_bot_api.yml"
 
 permissions:
-  contents: read   # untuk checkout
-  # id-token: write TIDAK diperlukan untuk mode SP secret (dipakai kalau OIDC)
+  contents: read   # checkout
 
 concurrency:
-  group: deploy-api-production
+  group: deploy-api-prod
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build (sanity)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install deps (sanity)
-        run: |
-          set -e
-          if [ -f requirements-api.txt ]; then
-            pip install -r requirements-api.txt
-          elif [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            echo "No requirements file found, skipping pip install"
-          fi
-
-      - name: Upload artifact (API source)
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-source
-          path: |
-            .
-            !**/.git/**
-            !**/.venv/**
-            !**/__pycache__/**
-            !antenv/
-
   deploy:
-    name: Deploy
+    name: Deploy API (single job)
     runs-on: ubuntu-latest
-    needs: build
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: api-source
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      # ===== LOGIN AZURE (PAKAI SECRET JSON) =====
-      - name: Azure Login (Service Principal JSON)
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Create deployment zip
-        run: |
-          set -e
-          zip -r api_deploy.zip . -x "**/.git/**" "**/__pycache__/**" "**/.venv/**" "*.DS_Store"
-          echo "=== ZIP CONTENTS (first 200 lines) ==="
-          unzip -l api_deploy.zip | head -n 200
-
-      - name: Deploy to Azure Web App (API)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'KID-BOT-API'     # <-- pastikan sama persis nama App Service
-          slot-name: 'Production'
-          package: 'api_deploy.zip'
-``
+    # ---- Preflight: pastikan secret ada & JSON valid (camelCase keys) ----
+    - name: Preflight - validate AZURE_CREDENTIALS secret
+      shell: bash
+      env:
+        AZ_JSON: ${{ secrets.AZURE_CREDENTIALS }}
+      run: |
+        set -e
+        if [ -z "${AZ_JSON}" ]; then
+          echo "::error::Secret AZURE_CREDENTIALS tidak ditemukan atau kosong. Buat di Settings > Secrets > Actions."
+          exit 1
+        fi
+        # install jq utk validasi JSON
+        sudo apt-get update -y >/dev/null 2>&1 || true
+        sudo apt-get install -y jq >/dev/null 2>&1 || true
+        echo "${AZ_JSON}" | jq . >/dev/null 2>&1 || (echo "::error::AZURE_CREDENTIALS bukan JSON valid"; exit 1)
+        for key in clientId clientSecret tenantId subscriptionId; do
+          echo "${AZ_JSON}" | jq -e --arg k "$key" 'has($k) and (.[$k] != null and .[$k] != "")' >/dev/null 2>&1 \
