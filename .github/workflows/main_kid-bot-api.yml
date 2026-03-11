@@ -1,7 +1,7 @@
-# Build & Deploy API to Azure App Service (Linux) via OIDC
-# Docs:
-# - Azure Login action (OIDC): https://github.com/marketplace/actions/azure-login
-# - Azure WebApps Deploy:      https://github.com/Azure/webapps-deploy
+# Build & Deploy API to Azure App Service (Linux) using SP JSON secret
+# - Login via azure/login@v1 with creds: ${{ secrets.AZURE_CREDENTIALS }}
+# - Deploy via azure/webapps-deploy@v3
+# - Hanya trigger kalau file API yang berubah (biar tidak tabrakan dengan worker)
 
 name: Build and deploy Python app to Azure Web App - KID-BOT-API
 
@@ -18,8 +18,8 @@ on:
       - ".github/workflows/main_kid_bot_api.yml"
 
 permissions:
-  contents: read
-  id-token: write  # Wajib untuk OIDC (GitHub menerbitkan ID token untuk Azure Login)
+  contents: read   # untuk checkout
+  # id-token: write TIDAK diperlukan untuk mode SP secret (dipakai kalau OIDC)
 
 concurrency:
   group: deploy-api-production
@@ -49,49 +49,10 @@ jobs:
             echo "No requirements file found, skipping pip install"
           fi
 
-      # Kemas source sebagai artefak (tanpa venv)
-      - name: Upload artifact
+      - name: Upload artifact (API source)
         uses: actions/upload-artifact@v4
         with:
           name: api-source
           path: |
             .
             !**/.git/**
-            !**/.venv/**
-            !**/__pycache__/**
-            !antenv/
-
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: api-source
-
-      # ====== LOGIN: OIDC TANPA SECRET DI FILE ======
-      # Nilai di bawah (client-id/tenant-id/subscription-id) DIAMBIL dari secrets
-      # yang dibuat Deployment Center atau kamu set manual. Pastikan 3 secret ada.
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id:       ${{ secrets.AZUREAPPSERVICE_CLIENTID_864DA03577C547B9A53F0E262F6DA748 }}
-          tenant-id:       ${{ secrets.AZUREAPPSERVICE_TENANTID_3FE12D3F8BE1404A97CF603B81A45AED }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_36200AB41B7B4D8BA3733C8B0BEEEE43 }}
-
-      - name: Create deployment zip
-        run: |
-          set -e
-          zip -r api_deploy.zip . -x "**/.git/**" "**/__pycache__/**" "**/.venv/**" "*.DS_Store"
-          echo "=== ZIP CONTENTS (first 200 lines) ==="
-          unzip -l api_deploy.zip | head -n 200
-
-      - name: Deploy to Azure Web App (API)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'KID-BOT-API'     # <-- pastikan persis sama dengan nama App Service API
-          slot-name: 'Production'
-          package: 'api_deploy.zip'
