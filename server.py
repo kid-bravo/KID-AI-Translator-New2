@@ -1,8 +1,13 @@
+# server.py
 from fastapi import FastAPI
 from app.main import app as api_app
 from bot.asgi import app as bot_app
 
 app = FastAPI(title="api-bot-composed")
 
-app.mount("/", api_app)
+# include semua router dari api_app
+for route in api_app.router.routes:
+    app.router.routes.append(route)
+
+# mount endpoint bot teams
 app.mount("/api/messages", bot_app)
