@@ -17,6 +17,7 @@ requests>=2.31,<3
 
 # Database
 SQLAlchemy>=2.0,<3
+aiosqlite   # <— INI WAJIB untuk "sqlite+aiosqlite://"
 asyncpg>=0.29 ; platform_system != "Windows"
 psycopg2-binary>=2.9
 
