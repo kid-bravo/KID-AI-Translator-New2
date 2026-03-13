@@ -1133,11 +1133,7 @@ class SBCSBot(TeamsActivityHandler):
         return await step.next(None)
 
     async def _translate_login_step(self, step: WaterfallStepContext):
-    # Skip OAuth login sementara
-    return await step.next(None)
-
-    # async def _translate_login_step(self, step: WaterfallStepContext):
-    #    return await step.begin_dialog("OAuthPrompt")
+        return await step.next(None)
     
 
     # async def _translate_submit_and_wait_step(self, step: WaterfallStepContext):
@@ -1382,7 +1378,7 @@ bot = SBCSBot(conv_state, user_state, activity_gate)
 
 router = APIRouter()
 
-@router.post("/messages")
+@router.post("/api/messages")
 async def api_messages(request: Request) -> Response:
     try:
         body = await request.json()
