@@ -1133,7 +1133,11 @@ class SBCSBot(TeamsActivityHandler):
         return await step.next(None)
 
     async def _translate_login_step(self, step: WaterfallStepContext):
-        return await step.begin_dialog("OAuthPrompt")
+    # Skip OAuth login sementara
+    return await step.next(None)
+
+    # async def _translate_login_step(self, step: WaterfallStepContext):
+    #    return await step.begin_dialog("OAuthPrompt")
     
 
     # async def _translate_submit_and_wait_step(self, step: WaterfallStepContext):
