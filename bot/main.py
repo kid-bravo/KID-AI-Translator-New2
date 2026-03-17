@@ -1378,7 +1378,7 @@ bot = SBCSBot(conv_state, user_state, activity_gate)
 
 router = APIRouter()
 
-@router.post("/messages")
+@router.post("/api/messages")
 async def api_messages(request: Request) -> Response:
     try:
         body = await request.json()

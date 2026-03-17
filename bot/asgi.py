@@ -1,7 +1,6 @@
-
-# bot/asgi.py  (VARIAN A)
+# bot/asgi.py
 from fastapi import FastAPI
-from bot.main import router as bot_router
+from bot.main import router  # your existing router
 
 app = FastAPI(title="SBCS Bot")
-app.include_router(bot_router, prefix="/api")  # hasil akhir: /api/me
+app.include_router(router)
