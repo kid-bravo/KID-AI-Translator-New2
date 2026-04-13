@@ -973,8 +973,8 @@ class SBCSBot(TeamsActivityHandler):
         ch  = (act.channel_id or "unknown")
         cid = getattr(act.conversation, "id", "") or "unknown"
         aid = act.id or f"noid-{int(time.time()*1000)}"
-        if not await self._gate.first_time(ch, cid, aid):
-            return
+#        if not await self._gate.first_time(ch, cid, aid):
+#            return
 
         # Handle action submit
         if act.type == ActivityTypes.message and isinstance(act.value, dict):
