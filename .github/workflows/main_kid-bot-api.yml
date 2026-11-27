@@ -1,4 +1,4 @@
-name: Deploy API (KID-BOT-API) - Minimal SP Secret (Stable)
+name: Deploy API (KID-BOT-API-PROD) - New Tenant
 
 on:
   workflow_dispatch: {}
@@ -9,7 +9,7 @@ permissions:
   contents: read   # checkout
 
 concurrency:
-  group: deploy-api-prod
+  group: deploy-api-new-prod
   cancel-in-progress: true
 
 jobs:
@@ -22,34 +22,7 @@ jobs:
       uses: actions/checkout@v4
 
     # ---- Preflight: validasi secret AZURE_CREDENTIALS (camelCase & JSON valid) ----
-    - name: Preflight - validate AZURE_CREDENTIALS secret
-      shell: bash
-      env:
-        AZ_JSON: ${{ secrets.AZURE_CREDENTIALS }}
-      run: |
-        set -euo pipefail
-        # 1) Pastikan secret ada
-        if [ -z "${AZ_JSON:-}" ]; then
-          echo "::error::Secret AZURE_CREDENTIALS tidak ditemukan atau kosong. Buat di Settings > Secrets > Actions."
-          exit 1
-        fi
-
-        # 2) Pastikan jq ada
-        sudo apt-get update -y >/dev/null 2>&1 || true
-        sudo apt-get install -y jq >/dev/null 2>&1 || true
-
-        # 3) Tulis ke file agar aman dari quoting/CRLF
-        printf '%s' "${AZ_JSON}" > cred.json
-
-        # 4) JSON valid?
-        jq . cred.json >/dev/null 2>&1 || { echo "::error::AZURE_CREDENTIALS bukan JSON valid"; exit 1; }
-
-        # 5) Wajib ada key camelCase dan nilainya tidak kosong
-        for key in clientId clientSecret tenantId subscriptionId; do
-          jq -e --arg k "$key" 'has($k) and (.[$k] != null and .[$k] != "")' cred.json >/dev/null 2>&1 \
-            || { echo "::error::Key '$key' tidak ada / kosong di AZURE_CREDENTIALS (wajib camelCase)."; exit 1; }
-        done
-        echo "Preflight OK"
+    
 
     # ---- (opsional) sanity install supaya error dependency cepat ketahuan ----
     - name: Install deps (sanity)
@@ -74,15 +47,15 @@ jobs:
         unzip -l api_deploy.zip | head -n 200
 
     # ---- LOGIN AZURE (SP JSON secret) ----
-    - name: Azure Login (Service Principal JSON)
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    #- name: Azure Login (Service Principal JSON)
+    #  uses: azure/login@v1
+    #  with:
+    #    creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     # ---- DEPLOY ----
     - name: Deploy to Azure Web App (API)
       uses: azure/webapps-deploy@v3
       with:
-        app-name: 'KID-BOT-API'   # <-- pastikan sama persis nama App Service API
-        slot-name: 'Production'
+        app-name: 'KID-BOT-API-PROD'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_API_NEW }}
         package: 'api_deploy.zip'
