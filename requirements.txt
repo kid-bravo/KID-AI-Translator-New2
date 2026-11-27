@@ -16,6 +16,7 @@ aiohttp>=3.9,<4.0
 
 SQLAlchemy>=2.0,<3
 asyncpg>=0.29 ; platform_system != "Windows"
+aiosqlite
 
 psycopg2-binary>=2.9
 
