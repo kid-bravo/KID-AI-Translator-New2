@@ -47,16 +47,12 @@ jobs:
         # pastikan file entry-point ikut:
         test -f worker/worker.py && echo "[OK] found worker/worker.py" || (echo "[FAIL] worker/worker.py not found in repo!" && exit 1)
 
-    # ====== LOGIN AZURE (harus sebelum deploy) ======
-    # Gunakan secret AZURE_CREDENTIALS (JSON camelCase: clientId, clientSecret, tenantId, subscriptionId)
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
 
     # ====== DEPLOY ======
     - name: Deploy to Azure Web App (worker)
       uses: azure/webapps-deploy@v3
       with:
-        app-name: "KID-Worker"          # <-- ganti bila nama App Service berbeda
+        app-name: "KID-WORKER-PROD"
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_WORKER_NEW }}
         package: "worker_deploy.zip"
